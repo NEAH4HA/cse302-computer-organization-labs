@@ -1,0 +1,21 @@
+# Lab 8 - FA0 full adder and 8-bit ripple-carry adder
+# Simulator: Logisim 2.7.1 (com.cburch.logisim.circuit.Propagator), run Fri Nov 20 22:37:51 UTC 2026
+FA0 truth table (from simulation):
+Cin A B | Cout S
+ 0  0 0 |  0   0
+ 0  0 1 |  0   1
+ 0  1 0 |  0   1
+ 0  1 1 |  1   0
+ 1  0 0 |  0   1
+ 1  0 1 |  1   0
+ 1  1 0 |  1   0
+ 1  1 1 |  1   1
+RESULT: 9 checks, 0 failures -> PASS
+RCA8: exhaustive test of all 131072 input combinations (A, B, Ci)
+  A=  0 B=  0 Ci=0 -> S=  0 Co=0
+  A=  5 B=  3 Ci=0 -> S=  8 Co=0
+  A=100 B= 27 Ci=1 -> S=128 Co=0
+  A=255 B=  1 Ci=0 -> S=  0 Co=1
+  A=255 B=255 Ci=1 -> S=255 Co=1
+  A=128 B=128 Ci=0 -> S=  0 Co=1
+RESULT: 131082 checks, 0 failures -> PASS

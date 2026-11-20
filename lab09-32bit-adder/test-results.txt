@@ -1,0 +1,9 @@
+# Lab 9 - 32-bit adder built from four 8-bit RCAs
+# Simulator: Logisim 2.7.1 (com.cburch.logisim.circuit.Propagator), run Fri Nov 20 22:38:03 UTC 2026
+Adder32: 20392 vectors (392 edge-case combinations + 20000 random, seed 302)
+  A=0x12345678 B=0x11111111 Ci=0 -> S=0x23456789 Co=0
+  A=0xFFFFFFFF B=0x00000001 Ci=0 -> S=0x00000000 Co=1
+  A=0x7FFFFFFF B=0x00000001 Ci=0 -> S=0x80000000 Co=0
+  A=0x000F4240 B=0x0023CACE Ci=1 -> S=0x00330D0F Co=0
+RCA8 (inside the Lab 9 file): 2000 random vectors
+RESULT: 22393 checks, 0 failures -> PASS

@@ -1,0 +1,8 @@
+file: lab11-alu/lab11_alu32.circ
+windows:
+  - Content window
+  - FocusProxy
+  - Logisim: ALU32 of lab11_alu32
+  - com-cburch-logisim-Main
+  - sun-awt-X11-XIconWindow
+stderr: 

@@ -1,0 +1,8 @@
+file: lab12-single-cycle-cpu/external-mini-mips/cpu/Single_Cycle_Cpu.circ
+windows:
+  - Content window
+  - FocusProxy
+  - Logisim: SingleCycleCPU of Single_Cycle_Cpu
+  - com-cburch-logisim-Main
+  - sun-awt-X11-XIconWindow
+stderr: 

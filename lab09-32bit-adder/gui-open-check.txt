@@ -1,0 +1,8 @@
+file: lab09-32bit-adder/lab09_adder32.circ
+windows:
+  - Content window
+  - FocusProxy
+  - Logisim: Adder32 of lab09_adder32
+  - com-cburch-logisim-Main
+  - sun-awt-X11-XIconWindow
+stderr: 

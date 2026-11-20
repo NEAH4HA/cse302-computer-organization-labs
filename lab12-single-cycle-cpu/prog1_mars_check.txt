@@ -1,0 +1,10 @@
+prog1.asm assembles to exactly prog1.txt
+
+Program terminated when maximum step limit 200 reached.
+
+$1	1
+$2	10
+$3	10
+$4	55
+$5	0
+Mem[0x00000000]	55	1	10	0	

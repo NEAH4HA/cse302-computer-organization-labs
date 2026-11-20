@@ -1,0 +1,5 @@
+tools/
+build/classes/
+_docx_media/
+_external/
+*.bak

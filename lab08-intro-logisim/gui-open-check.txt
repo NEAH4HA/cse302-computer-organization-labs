@@ -1,0 +1,8 @@
+file: lab08-intro-logisim/lab08_rca8.circ
+windows:
+  - Content window
+  - FocusProxy
+  - Logisim: RCA8 of lab08_rca8
+  - com-cburch-logisim-Main
+  - sun-awt-X11-XIconWindow
+stderr: 
