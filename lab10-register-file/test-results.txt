@@ -1,16 +1,21 @@
-# Lab 10 - 32x32-bit register file (Figure 10.2)
-# Simulator: Logisim 2.7.1 (com.cburch.logisim.circuit.Propagator), run Fri Nov 20 22:38:32 UTC 2026
-1) power-up: all 32 registers read 0 on BusA and BusB
-2) wrote random values to R0..R31 (RegWrite=1, one rising edge each)
+# Lab 10 - 32x32-bit register file (class design, Figure 10.2 idea)
+# Simulator: Logisim 2.7.1 (com.cburch.logisim.circuit.Propagator), run Sat Nov 21 12:35:40 UTC 2026
+3x4 zipper: all 4096 inputs, Ci = {RW[i],RB[i],RA[i]}
+3x4 Zipper (4 wide): 2000 random inputs
+32 bit Register: write only when W=1 on the clock edge; A/B buffers float (x) unless enabled
+32 bit 0 Register: always reads 0
+1) power-up: all 32 registers read 0 on Bus A and Bus B
+2) wrote a random value to R0..R31 (RegWrite=1, one clock cycle each)
 3) read back all 1024 (RA,RB) combinations; R0 stays 0
-   R0  = 0x00000000 (BusA) 0x00000000 (BusB)
-   R1  = 0x721516F8 (BusA) 0x721516F8 (BusB)
-   R2  = 0x41FF5D3A (BusA) 0x41FF5D3A (BusB)
-   R3  = 0x69B4A5B4 (BusA) 0x69B4A5B4 (BusB)
-   R4  = 0x0F27DC1C (BusA) 0x0F27DC1C (BusB)
-   R5  = 0xAC12A480 (BusA) 0xAC12A480 (BusB)
-   R31 = 0xAF74B6EC (BusA) 0xAF74B6EC (BusB)
-4) RegWrite=0 + clock edges with BusW=0xDEADBEEF: no register changed
-5) write happens only on the rising clock edge (R7 = 0x0BADF00D)
+   R0  = 0x00000000 (Bus A) 0x00000000 (Bus B)
+   R1  = 0x16CBA47B (Bus A) 0x16CBA47B (Bus B)
+   R2  = 0x59FF3AC4 (Bus A) 0x59FF3AC4 (Bus B)
+   R3  = 0xAB316E78 (Bus A) 0xAB316E78 (Bus B)
+   R4  = 0x73831D7B (Bus A) 0x73831D7B (Bus B)
+   R15 = 0x148358FE (Bus A) 0x148358FE (Bus B)
+   R16 = 0x126879D3 (Bus A) 0x126879D3 (Bus B)
+   R31 = 0x5DE74C54 (Bus A) 0x5DE74C54 (Bus B)
+4) RegWrite=0 + clock cycles with Bus W=0xDEADBEEF: no register changed
+5) the write happens on the rising clock edge only (R7 = 0x0BADF00D)
 6) RA=RB=RW=31: old value before the edge, 0xCAFEBABE after it on both buses
-RESULT: 1062 checks, 0 failures -> PASS
+RESULT: 25451 checks, 0 failures -> PASS

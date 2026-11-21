@@ -3,3 +3,6 @@ build/classes/
 _docx_media/
 _external/
 *.bak
+_lab_images/
+Lab_images.7z
+*.7z

@@ -157,6 +157,45 @@ public class LogisimKit {
 
     public static Location L(int x, int y) { return Location.create(x, y); }
 
+    /**
+     * Custom sub-circuit appearance, like drawing it with the Appearance tool:
+     * outline = {x,y,w,h} rectangle, or a closed polygon {x1,y1,x2,y2,...} when polygon=true;
+     * texts = {text, x, y} (centred); ports = {pinLabel, x, y}; anchor at (ax, ay) facing east.
+     */
+    public static void appearance(Circuit c, boolean polygon, int[] outline, int stroke,
+                                  Object[][] texts, Object[][] ports, int ax, int ay) {
+        List<com.cburch.draw.model.CanvasObject> shapes = new ArrayList<>();
+        com.cburch.draw.model.AbstractCanvasObject body;
+        if (polygon) {
+            List<Location> pts = new ArrayList<>();
+            for (int i = 0; i < outline.length; i += 2) pts.add(L(outline[i], outline[i + 1]));
+            body = new com.cburch.draw.shapes.Poly(true, pts);
+        } else {
+            body = new com.cburch.draw.shapes.Rectangle(outline[0], outline[1], outline[2], outline[3]);
+            body.setValue(com.cburch.draw.shapes.DrawAttr.PAINT_TYPE, com.cburch.draw.shapes.DrawAttr.PAINT_STROKE);
+        }
+        body.setValue(com.cburch.draw.shapes.DrawAttr.STROKE_WIDTH, stroke);
+        shapes.add(body);
+        for (Object[] t : texts) {
+            com.cburch.draw.shapes.Text tx = new com.cburch.draw.shapes.Text((Integer) t[1], (Integer) t[2], (String) t[0]);
+            tx.setValue(com.cburch.draw.shapes.DrawAttr.ALIGNMENT, com.cburch.draw.shapes.DrawAttr.ALIGN_CENTER);
+            shapes.add(tx);
+        }
+        Map<String, Component> pins = new HashMap<>();
+        for (Component comp : c.getNonWires())
+            if (comp.getFactory() instanceof Pin) pins.put(comp.getAttributeSet().getValue(StdAttr.LABEL), comp);
+        for (Object[] p : ports) {
+            Component pin = pins.get((String) p[0]);
+            if (pin == null) throw new IllegalArgumentException("appearance: no pin " + p[0] + " in " + c.getName());
+            shapes.add(new com.cburch.logisim.circuit.appear.AppearancePort(L((Integer) p[1], (Integer) p[2]), Instance.getInstanceFor(pin)));
+        }
+        if (ports.length != pins.size())
+            throw new IllegalArgumentException("appearance: " + c.getName() + " has " + pins.size() + " pins, " + ports.length + " ports drawn");
+        shapes.add(new com.cburch.logisim.circuit.appear.AppearanceAnchor(L(ax, ay)));
+        c.getAppearance().setDefaultAppearance(false);
+        c.getAppearance().setObjectsForce(shapes);
+    }
+
     public static Location end(Component c, int i) { return c.getEnd(i).getLocation(); }
 
     /** Port location of a subcircuit instance, looked up by the label of the inner pin. */

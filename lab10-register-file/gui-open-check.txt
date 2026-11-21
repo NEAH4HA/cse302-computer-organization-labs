@@ -2,7 +2,7 @@ file: lab10-register-file/lab10_register_file.circ
 windows:
   - Content window
   - FocusProxy
-  - Logisim: RegisterFile of lab10_register_file
+  - Logisim: Register File of lab10_register_file
   - com-cburch-logisim-Main
   - sun-awt-X11-XIconWindow
 stderr: 
