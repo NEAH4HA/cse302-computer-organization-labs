@@ -11,14 +11,14 @@ Solutions for Labs 7–12. Every file was made with, and checked in, the **real 
 | [8](lab08-intro-logisim) | Full adder FA0, 8-bit RCA | [`lab08_rca8.circ`](lab08-intro-logisim/lab08_rca8.circ) | 131 082 checks (exhaustive), opens in GUI |
 | [9](lab09-32bit-adder) | 32-bit adder from 4 × RCA8 | [`lab09_adder32.circ`](lab09-32bit-adder/lab09_adder32.circ) | 22 393 checks, opens in GUI |
 | [10](lab10-register-file) | 32 × 32-bit register file (class design) | [`lab10_register_file.circ`](lab10-register-file/lab10_register_file.circ) | 25 451 checks, opens in GUI |
-| [11](lab11-alu) | 32-bit ALU, 32 × 1 bit ALU (class design) | [`lab11_alu32.circ`](lab11-alu/lab11_alu32.circ) | 21 225 checks, opens in GUI |
+| [11](lab11-alu) | 32-bit ALU, 32 × 1 bit ALU (class design) + shifter, Overflow | [`lab11_alu32.circ`](lab11-alu/lab11_alu32.circ) | 23 852 checks, opens in GUI |
 | [12](lab12-single-cycle-cpu) | Single-cycle CPU, `prog1.txt` | [MIPS instructions + trace](lab12-single-cycle-cpu/README.md) | Ran in Logisim (memory word 0 = 55); MARS re-assembles to identical machine code |
 
 ## Labs 10 and 11 follow the design shown in class
 
 Labs 10 and 11 were rebuilt to match the instructor's Logisim design in the lab photos.
 - **Lab 10** uses the `Register File` → `Register Cell` → `32 bit Register` hierarchy with the zippers.
-- **Lab 11** uses the `32 Bit ALU` made of 32 × `1 bit ALU`.
+- **Lab 11** uses the `32 Bit ALU` made of 32 × `1 bit ALU`. It also adds what the lab sheet's Appendix 11 asks for: a shifter block (SLL/SRL/SRA), an `Overflow` output, and an SLT that stays correct when A − B overflows. These are extra outputs and op codes; the class pins and op codes are unchanged.
 
 The circuits use the same circuit names, pins, op codes and block symbols, so they plug into the class CPU the same way.
 They were built here with Logisim's API and tested; nothing was copied from the class file. The photos themselves are not published.

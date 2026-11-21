@@ -1,5 +1,5 @@
-# Lab 11 - 32-bit ALU (class design: 32 x 1 bit ALU)
-# Simulator: Logisim 2.7.1 (com.cburch.logisim.circuit.Propagator), run Sat Nov 21 12:35:42 UTC 2026
+# Lab 11 - 32-bit ALU (class design: 32 x 1 bit ALU, plus shifter, Overflow and SLT fix)
+# Simulator: Logisim 2.7.1 (com.cburch.logisim.circuit.Propagator), run Sat Nov 21 16:25:23 UTC 2026
 1 bit ALU, Result for inputs A B Less Sub Cin = 00000 .. 11111:
   Op 0: 00000000000000000000000011111111
   Op 1: 00000000111111111111111111111111
@@ -10,20 +10,28 @@
   Op 6: 00000000000000000000000000000000
   Op 7: 00000000000000000000000000000000
   (Set = sum bit and C out = carry checked on all 256 cases)
-32 Bit ALU: AND, OR, XOR, NOR, ADD, SUB, SLT and unused Op 6/7 on 2145 (A,B) pairs (144 edge cases + 2000 random, seed 11 + A=B): Result and Zero flag
-SLT = signed A < B on all 1663 pairs whose A-B does not overflow; 482 pairs overflow, where (like the class design) SLT gives the sign bit of A-B
+32 Bit ALU: AND, OR, XOR, NOR, ADD, SUB, SLT, SLL, SRL, SRA (and SLL with Sub = 1) on 2145 (A,B) pairs (144 edge cases + 2000 random, seed 11 + A=B): Result, Zero flag and Overflow
+Overflow = 1 exactly on signed overflow of ADD (533 pairs) and SUB (482 pairs), 0 for every other op
+SLT = true signed A < B on every pair, including the 482 pairs where A - B overflows
+Shifts: B shifted by A[4:0] (A = 0, 1, 2, 5, 31 in the edge cases, random amounts otherwise)
 Examples (from simulation):
-  op   A          B          | Result     Zero
-  ADD  0x00000005 0x00000003 | 0x00000008 0
-  ADD  0xFFFFFFFF 0x00000001 | 0x00000000 1
-  SUB  0x00000005 0x00000003 | 0x00000002 0
-  SUB  0x00000003 0x00000005 | 0xFFFFFFFE 0
-  SLT  0x00000003 0x00000005 | 0x00000001 0
-  SLT  0x00000005 0x00000003 | 0x00000000 1
-  SLT  0xFFFFFFFF 0x00000001 | 0x00000001 0
-  SUB  0x12345678 0x12345678 | 0x00000000 1
-  AND  0x0000000C 0x0000000A | 0x00000008 0
-  OR   0x0000000C 0x0000000A | 0x0000000E 0
-  XOR  0x0000000C 0x0000000A | 0x00000006 0
-  NOR  0x0000000C 0x0000000A | 0xFFFFFFF1 0
-RESULT: 21225 checks, 0 failures -> PASS
+  op   A          B          | Result     Zero Ovf
+  ADD  0x00000005 0x00000003 | 0x00000008 0    0
+  ADD  0xFFFFFFFF 0x00000001 | 0x00000000 1    0
+  ADD  0x7FFFFFFF 0x00000001 | 0x80000000 0    1
+  SUB  0x00000005 0x00000003 | 0x00000002 0    0
+  SUB  0x00000003 0x00000005 | 0xFFFFFFFE 0    0
+  SUB  0x80000000 0x00000001 | 0x7FFFFFFF 0    1
+  SLT  0x00000003 0x00000005 | 0x00000001 0    0
+  SLT  0x00000005 0x00000003 | 0x00000000 1    0
+  SLT  0xFFFFFFFF 0x00000001 | 0x00000001 0    0
+  SLT  0x80000000 0x00000001 | 0x00000001 0    0
+  SUB  0x12345678 0x12345678 | 0x00000000 1    0
+  AND  0x0000000C 0x0000000A | 0x00000008 0    0
+  OR   0x0000000C 0x0000000A | 0x0000000E 0    0
+  XOR  0x0000000C 0x0000000A | 0x00000006 0    0
+  NOR  0x0000000C 0x0000000A | 0xFFFFFFF1 0    0
+  SLL  0x00000004 0x0000000F | 0x000000F0 0    0
+  SRL  0x00000004 0xF0000000 | 0x0F000000 0    0
+  SRA  0x00000004 0xF0000000 | 0xFF000000 0    0
+RESULT: 23852 checks, 0 failures -> PASS

@@ -12,9 +12,12 @@ import com.cburch.logisim.data.Location;
  *     Op 0 AND, 1 OR, 2 XOR, 3 NOR (on A, B)
  *     Op 4 SUM  = A + (B xor Sub) + Cin   (C out = carry, Set = sum bit)
  *     Op 5 LESS = the Less input            (Op 6, 7 unused -> 0)
- *   32 Bit ALU  inputs A, B, Sub, Op   outputs Result, Zero flag
+ *   32 Bit ALU  inputs A, B, Sub, Op   outputs Result, Zero flag, Overflow
  *     carry-in of bit 0 = Sub (two's complement subtract), carries ripple bit i -> i+1,
- *     Less of bit 0 = Set of bit 31 (slt), Less of bits 1..31 = 0, Zero flag = NOR of the result.
+ *     V = c31 xor c32 (signed overflow of A + (B xor Sub)); Overflow = V when Op = 4 (add/sub), else 0,
+ *     Less of bit 0 = Set31 xor V (slt, correct even when A - B overflows), Less of bits 1..31 = 0,
+ *     Shifter block (Appendix 11): B shifted by A[4:0]; Op 6 = SLL, Op 7 = SRL (Sub = 0) / SRA (Sub = 1),
+ *     a 2:1 mux picks the shifter (Op = 6, 7) or the slices (Op = 0..5); Zero flag = NOR of the result.
  */
 public class Alu {
     static Location L(int x, int y) { return LogisimKit.L(x, y); }
@@ -104,7 +107,7 @@ public class Alu {
             Component u = sh.sub(alu1, x, y);
             sh.stubTunnel(port(u, "A"), 'W', 30, "a" + i, 1);
             sh.stubTunnel(port(u, "B"), 'W', 30, "b" + i, 1);
-            if (i == 0) sh.stubTunnel(port(u, "Less"), 'W', 30, "Set31", 1);   // slt: Less0 = Set31
+            if (i == 0) sh.stubTunnel(port(u, "Less"), 'W', 30, "less", 1);    // slt: Less0 = Set31 xor V
             else {
                 Location l = port(u, "Less");
                 Component z = sh.add("Wiring", "Constant", l.getX() - 20, l.getY(), "value", "0x0");
@@ -118,20 +121,68 @@ public class Alu {
             else if (i != 31) {                                                 // ripple carry to the slice below
                 Location co = port(u, "C out");
                 Location ci = co.translate(10, 120 - 70);                       // next slice's Cin
-                sh.wire(co, co.translate(0, 25), co.translate(10, 25), ci);
+                if (i == 30) {                                                  // carry into bit 31 tapped west
+                    sh.wire(co, co.translate(0, 12), co.translate(0, 25), co.translate(10, 25), ci);
+                    sh.stubTunnel(co.translate(0, 12), 'W', 40, "c31", 1);
+                } else sh.wire(co, co.translate(0, 25), co.translate(10, 25), ci);
             }
-            if (i == 31) sh.stubTunnel(port(u, "Set"), 'S', 20, "Set31", 1);
+            if (i == 31) {
+                sh.stubTunnel(port(u, "Set"), 'S', 20, "Set31", 1);
+                sh.stubTunnel(port(u, "C out"), 'S', 50, "c32", 1);              // carry out of bit 31
+            }
             sh.stubTunnel(port(u, "Result"), 'E', 30, "r" + i, 1);
         }
 
         // result bus: 32 -> 1 splitter
         Component rs = sh.add("Wiring", "Splitter", 1500, 400, "facing", "west", "fanout", "32", "incoming", "32", "appear", "left");
         for (int b = 0; b < 32; b++) sh.stubTunnel(end(rs, b + 1), 'W', 20 + 50 * (b % 3), "r" + b, 1);
-        Component res = sh.pinOut("Result", 32, 1600, 400);
-        Location j = L(1540, 400);
-        sh.wire(end(rs, 0), j, end(res, 0));
-        sh.wire(j, L(1540, 440));
-        sh.tunnel("R", 32, L(1540, 440), "north");
+        sh.stubTunnel(end(rs, 0), 'E', 30, "Rs", 32);                  // result of the 32 slices
+
+        // ---- Shifter block (Appendix 11): B shifted by A[4:0]
+        List<String> kv = new ArrayList<>(Arrays.asList("facing", "east", "fanout", "2", "incoming", "32", "appear", "left"));
+        for (int b = 0; b < 32; b++) { kv.add("bit" + b); kv.add(b < 5 ? "0" : "1"); }   // A[4:0] -> output 0
+        Component sa = sh.add("Wiring", "Splitter", 2000, 160, kv.toArray(new String[0]));
+        sh.stubTunnel(end(sa, 0), 'W', 30, "A", 32);
+        sh.stubTunnel(end(sa, 1), 'E', 30, "sh", 5);
+        String[] kind = {"ll", "lr", "ar"}, kout = {"sll", "srl", "sra"};
+        for (int i = 0; i < 3; i++) {
+            Component s = sh.add("Arithmetic", "Shifter", 2300, 160 + 100 * i, "width", "32", "shift", kind[i]);
+            sh.stubTunnel(end(s, 0), 'W', 30, "B", 32);
+            sh.stubTunnel(end(s, 1), 'W', 30, "sh", 5);
+            sh.stubTunnel(end(s, 2), 'E', 30, kout[i], 32);
+        }
+        // Op bits
+        Component os = sh.add("Wiring", "Splitter", 2000, 420, "facing", "east", "fanout", "3", "incoming", "3", "appear", "left");
+        sh.stubTunnel(end(os, 0), 'W', 30, "Op", 3);
+        for (int b = 0; b < 3; b++) sh.stubTunnel(end(os, b + 1), 'E', 20 + 50 * b, "op" + b, 1);
+        // result selection: SRL/SRA by Sub, SLL/right by op0, shifter/slices by op2 AND op1
+        String[][] mx = {{"srl", "sra", "Sub", "srx"}, {"sll", "srx", "op0", "shf"}, {"Rs", "shf", "isShift", null}};
+        Component last = null;
+        for (int i = 0; i < 3; i++) {
+            Component m = sh.add("Plexers", "Multiplexer", 2500, 480 + 120 * i, "select", "1", "width", "32", "enable", "false");
+            sh.stubTunnel(end(m, 0), 'W', 30, mx[i][0], 32);
+            sh.stubTunnel(end(m, 1), 'W', 30, mx[i][1], 32);
+            sh.stubTunnel(end(m, 2), 'S', 20, mx[i][2], 1);
+            if (mx[i][3] != null) sh.stubTunnel(end(m, 3), 'E', 30, mx[i][3], 32);
+            last = m;
+        }
+        Component res = sh.pinOut("Result", 32, 2640, 720);
+        Location j = L(2560, 720);
+        sh.wire(end(last, 3), j, end(res, 0));
+        sh.wire(j, L(2560, 760));
+        sh.tunnel("R", 32, L(2560, 760), "north");
+        gate(sh, "AND Gate", 2100, 560, "op2", "op1", "isShift");
+
+        // ---- Overflow and SLT
+        gate(sh, "XOR Gate", 2100, 680, "c31", "c32", "V");          // signed overflow of A + (B xor Sub)
+        gate(sh, "XOR Gate", 2100, 780, "Set31", "V", "less");       // slt = sign xor overflow
+        gate(sh, "NOR Gate", 2100, 880, "op1", "op0", "lo0");
+        gate(sh, "AND Gate", 2100, 980, "op2", "lo0", "isAdd");      // Op = 4 (add / sub)
+        gate(sh, "AND Gate", 2100, 1080, "V", "isAdd", "ovf");
+        Component ovp = sh.pinOut("Overflow", 1, 2240, 1080);
+        sh.stubTunnel(end(ovp, 0), 'W', 40, "ovf", 1);
+        sh.add("Base", "Text", 2300, 80, "text", "Shifter: B shifted by A[4:0]  (Op 6 SLL, Op 7 SRL / SRA when Sub = 1)");
+        sh.add("Base", "Text", 2160, 640, "text", "Overflow and SLT");
 
         // Zero flag: 32-input NOR of the result bits
         Component nor = sh.add("Gates", "NOR Gate", 1740, 1200, "inputs", "32", "size", "30");
@@ -155,9 +206,9 @@ public class Alu {
         sh.commit();
         LogisimKit.appearance(c, false, new int[]{50, 50, 160, 180}, 2,
                 new Object[][]{{"A", 62, 94}, {"B", 62, 144}, {"Sub", 100, 67}, {"Op", 170, 67},
-                        {"R", 198, 104}, {"Zero", 190, 194}, {"32 Bit ALU", 130, 145}},
+                        {"R", 198, 104}, {"Ovf", 193, 154}, {"Zero", 190, 194}, {"32 Bit ALU", 125, 125}},
                 new Object[][]{{"A", 50, 90}, {"B", 50, 140}, {"Sub", 100, 50}, {"Op", 170, 50},
-                        {"Result", 210, 100}, {"Zero flag", 210, 190}}, 50, 90);
+                        {"Result", 210, 100}, {"Overflow", 210, 150}, {"Zero flag", 210, 190}}, 50, 90);
         return c;
     }
 
@@ -174,7 +225,7 @@ public class Alu {
 
     public static void test(String root) throws Exception {
         String f = root + "/lab11-alu/lab11_alu32.circ";
-        Tests.begin(root, "lab11-alu", "Lab 11 - 32-bit ALU (class design: 32 x 1 bit ALU)");
+        Tests.begin(root, "lab11-alu", "Lab 11 - 32-bit ALU (class design: 32 x 1 bit ALU, plus shifter, Overflow and SLT fix)");
 
         // ---- 1 bit ALU: every Op x every (A, B, Less, Sub, Cin)
         LogisimKit.Sim s1 = new LogisimKit.Sim(f, "1 bit ALU");
@@ -205,46 +256,49 @@ public class Alu {
         for (int i = 0; i < 2000; i++) ab.add(new long[]{u(rnd.nextInt()), u(rnd.nextInt())});
         ab.add(new long[]{0x12345678L, 0x12345678L});
 
-        String[] names = {"AND", "OR", "XOR", "NOR", "ADD", "SUB", "SLT", "Op6", "Op7"};
-        int[][] ctl = {{0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {1, 4}, {1, 5}, {0, 6}, {0, 7}}; // {Sub, Op}
-        int sltTrue = 0, sltOvf = 0;
+        String[] names = {"AND", "OR", "XOR", "NOR", "ADD", "SUB", "SLT", "SLL", "SRL", "SRA", "SLL*"};
+        int[][] ctl = {{0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {1, 4}, {1, 5}, {0, 6}, {0, 7}, {1, 7}, {1, 6}}; // {Sub, Op}
+        int sltOvf = 0, ovfAdd = 0, ovfSub = 0;
         for (long[] v : ab) {
             long A = v[0], B = v[1];
+            int sa = (int) (A & 31), bi = (int) B;
             for (int op = 0; op < names.length; op++) {
-                long exp;
+                long exp, expV = 0;
                 switch (op) {
                     case 0: exp = A & B; break;
                     case 1: exp = A | B; break;
                     case 2: exp = A ^ B; break;
                     case 3: exp = u(~(A | B)); break;
-                    case 4: exp = u(A + B); break;
-                    case 5: exp = u(A - B); break;
-                    case 6: exp = u(A - B) >>> 31; break;   // class design: Set = sign bit of A - B
-                    default: exp = 0;
+                    case 4: exp = u(A + B); expV = (long) (int) A + (int) B != (int) (A + B) ? 1 : 0; break;
+                    case 5: exp = u(A - B); expV = (long) (int) A - (int) B != (int) (A - B) ? 1 : 0; break;
+                    case 6: exp = (int) A < (int) B ? 1 : 0; break;      // true signed compare, overflow or not
+                    case 7: case 10: exp = u(bi << sa); break;
+                    case 8: exp = u(bi >>> sa); break;
+                    default: exp = u(bi >> sa);
                 }
                 s.set("A", A); s.set("B", B); s.set("Sub", ctl[op][0]); s.set("Op", ctl[op][1]); s.propagate();
-                long r = s.get("Result");
-                Tests.check(r == exp && s.get("Zero flag") == (exp == 0 ? 1 : 0),
-                        String.format("%s A=%08x B=%08x got %08x Z=%d exp %08x", names[op], A, B, r, s.get("Zero flag"), exp));
-                if (op == 6) {
-                    boolean ovf = ((long) (int) A - (long) (int) B) != (int) (A - B);
-                    if (ovf) sltOvf++;
-                    else { Tests.check(r == ((int) A < (int) B ? 1 : 0), "slt signed compare"); sltTrue++; }
-                }
+                long r = s.get("Result"), z = s.get("Zero flag"), ov = s.get("Overflow");
+                Tests.check(r == exp && z == (exp == 0 ? 1 : 0) && ov == expV,
+                        String.format("%s A=%08x B=%08x got %08x Z=%d V=%d exp %08x V=%d", names[op], A, B, r, z, ov, exp, expV));
+                if (op == 4 && expV == 1) ovfAdd++;
+                if (op == 5 && expV == 1) ovfSub++;
+                if (op == 6 && (long) (int) A - (int) B != (int) (A - B)) sltOvf++;
             }
         }
-        Tests.log.println("32 Bit ALU: AND, OR, XOR, NOR, ADD, SUB, SLT and unused Op 6/7 on " + ab.size()
-                + " (A,B) pairs (" + edge.length * edge.length + " edge cases + 2000 random, seed 11 + A=B): Result and Zero flag");
-        Tests.log.println("SLT = signed A < B on all " + sltTrue + " pairs whose A-B does not overflow; "
-                + sltOvf + " pairs overflow, where (like the class design) SLT gives the sign bit of A-B");
+        Tests.log.println("32 Bit ALU: AND, OR, XOR, NOR, ADD, SUB, SLT, SLL, SRL, SRA (and SLL with Sub = 1) on " + ab.size()
+                + " (A,B) pairs (" + edge.length * edge.length + " edge cases + 2000 random, seed 11 + A=B): Result, Zero flag and Overflow");
+        Tests.log.println("Overflow = 1 exactly on signed overflow of ADD (" + ovfAdd + " pairs) and SUB (" + ovfSub + " pairs), 0 for every other op");
+        Tests.log.println("SLT = true signed A < B on every pair, including the " + sltOvf + " pairs where A - B overflows");
+        Tests.log.println("Shifts: B shifted by A[4:0] (A = 0, 1, 2, 5, 31 in the edge cases, random amounts otherwise)");
         Tests.log.println("Examples (from simulation):");
-        Tests.log.println("  op   A          B          | Result     Zero");
-        long[][] ex = {{4, 5, 3}, {4, 0xFFFFFFFFL, 1}, {5, 5, 3}, {5, 3, 5}, {6, 3, 5}, {6, 5, 3},
-                {6, 0xFFFFFFFFL, 1}, {5, 0x12345678L, 0x12345678L}, {0, 0xC, 0xA}, {1, 0xC, 0xA}, {2, 0xC, 0xA}, {3, 0xC, 0xA}};
+        Tests.log.println("  op   A          B          | Result     Zero Ovf");
+        long[][] ex = {{4, 5, 3}, {4, 0xFFFFFFFFL, 1}, {4, 0x7FFFFFFFL, 1}, {5, 5, 3}, {5, 3, 5}, {5, 0x80000000L, 1}, {6, 3, 5}, {6, 5, 3},
+                {6, 0xFFFFFFFFL, 1}, {6, 0x80000000L, 1}, {5, 0x12345678L, 0x12345678L}, {0, 0xC, 0xA}, {1, 0xC, 0xA}, {2, 0xC, 0xA}, {3, 0xC, 0xA},
+                {7, 4, 0x0000000FL}, {8, 4, 0xF0000000L}, {9, 4, 0xF0000000L}};
         for (long[] e : ex) {
             int op = (int) e[0];
             s.set("A", e[1]); s.set("B", e[2]); s.set("Sub", ctl[op][0]); s.set("Op", ctl[op][1]); s.propagate();
-            Tests.log.println(String.format("  %-4s 0x%08X 0x%08X | 0x%08X %d", names[op], e[1], e[2], s.get("Result"), s.get("Zero flag")));
+            Tests.log.println(String.format("  %-4s 0x%08X 0x%08X | 0x%08X %d    %d", names[op], e[1], e[2], s.get("Result"), s.get("Zero flag"), s.get("Overflow")));
         }
         Tests.end(s);
     }
